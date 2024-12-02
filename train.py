@@ -44,6 +44,7 @@ import os
 
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.models import Sequential
+from tensorflow.keras import optimizers
 from tensorflow.keras.layers import Dropout, Flatten, Dense
 from tensorflow.keras import applications
 from tensorflow.keras.callbacks import CSVLogger
@@ -79,8 +80,13 @@ def save_bottlebeck_features():
         batch_size=batch_size,
         class_mode=None,
         shuffle=False)
+    # Ensure the generator yields elements with the correct structure
+    def generator_wrapper(generator):
+        for batch in generator:
+            yield (batch,)
+
     bottleneck_features_train = model.predict(
-        generator, nb_train_samples // batch_size)
+        generator_wrapper(generator), steps=nb_validation_samples // batch_size)
     np.save(open('bottleneck_features_train.npy', 'wb'),
             bottleneck_features_train)
 
@@ -90,8 +96,9 @@ def save_bottlebeck_features():
         batch_size=batch_size,
         class_mode=None,
         shuffle=False)
+    
     bottleneck_features_validation = model.predict(
-        generator, nb_validation_samples // batch_size)
+        generator_wrapper(generator), steps=nb_validation_samples // batch_size)
     np.save(open('bottleneck_features_validation.npy', 'wb'),
             bottleneck_features_validation)
 
@@ -105,6 +112,9 @@ def train_top_model():
     validation_labels = np.array(
         [0] * (int(nb_validation_samples / 2)) +
         [1] * (int(nb_validation_samples / 2)))
+
+    # Ensure train_labels matches the size of train_data
+    train_labels = train_labels[:train_data.shape[0]]
 
     model = Sequential()
     model.add(Flatten(input_shape=train_data.shape[1:]))
